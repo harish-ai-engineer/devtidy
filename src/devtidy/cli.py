@@ -6,12 +6,22 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from rich_argparse import RichHelpFormatter
+
 from devtidy import __version__
 from devtidy.models import Candidate
 from devtidy.rules import RULES
 from devtidy.safety import UnsafePathError
 from devtidy.scanner import scan
 from devtidy.storage import archive, delete, read_history, restore
+from devtidy.ui import (
+    make_console,
+    render_action_result,
+    render_candidates,
+    render_error,
+    render_header,
+    scan_status,
+)
 from devtidy.units import human_size, parse_duration, parse_size
 
 
@@ -42,20 +52,35 @@ def _add_scan_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--exclude", action="append", default=[], metavar="GLOB")
     parser.add_argument("--max-depth", type=int)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="disable colors and terminal styling",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="devtidy",
         description="Safely reclaim stale developer artifacts.",
+        epilog="Scan first. Archive when unsure. Delete only when you mean it.",
+        formatter_class=RichHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command")
 
-    scan_parser = subparsers.add_parser("scan", help="find cleanup candidates")
+    scan_parser = subparsers.add_parser(
+        "scan",
+        help="find cleanup candidates",
+        formatter_class=RichHelpFormatter,
+    )
     _add_scan_arguments(scan_parser)
 
-    clean_parser = subparsers.add_parser("clean", help="archive or delete candidates")
+    clean_parser = subparsers.add_parser(
+        "clean",
+        help="archive or delete candidates",
+        formatter_class=RichHelpFormatter,
+    )
     _add_scan_arguments(clean_parser)
     action = clean_parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--archive", action="store_true")
@@ -66,18 +91,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm the selected cleanup action",
     )
 
-    restore_parser = subparsers.add_parser("restore", help="restore an archive session")
+    restore_parser = subparsers.add_parser(
+        "restore",
+        help="restore an archive session",
+        formatter_class=RichHelpFormatter,
+    )
     restore_parser.add_argument("session_id", nargs="?")
     restore_parser.add_argument("--latest", action="store_true")
     restore_parser.add_argument("--overwrite", action="store_true")
     restore_parser.add_argument("--json", action="store_true")
+    restore_parser.add_argument("--no-color", action="store_true")
 
-    history_parser = subparsers.add_parser("history", help="show local cleanup history")
+    history_parser = subparsers.add_parser(
+        "history",
+        help="show local cleanup history",
+        formatter_class=RichHelpFormatter,
+    )
     history_parser.add_argument("--limit", type=int, default=10)
     history_parser.add_argument("--json", action="store_true")
+    history_parser.add_argument("--no-color", action="store_true")
 
-    rules_parser = subparsers.add_parser("rules", help="explain built-in matching rules")
+    rules_parser = subparsers.add_parser(
+        "rules",
+        help="explain built-in matching rules",
+        formatter_class=RichHelpFormatter,
+    )
     rules_parser.add_argument("--json", action="store_true")
+    rules_parser.add_argument("--no-color", action="store_true")
     return parser
 
 
@@ -92,48 +132,64 @@ def _candidates(args: argparse.Namespace) -> list[Candidate]:
     )
 
 
-def _print_candidates(candidates: list[Candidate]) -> None:
-    if not candidates:
-        print("No cleanup candidates found.")
-        return
-    for candidate in candidates:
-        activity = datetime.fromtimestamp(candidate.last_activity).strftime("%Y-%m-%d")
-        print(
-            f"{human_size(candidate.size):>10}  "
-            f"{candidate.category:<7}  {activity}  {candidate.path}"
-        )
-    print(f"\nPotential savings: {human_size(sum(item.size for item in candidates))}")
-
-
 def _scan_command(args: argparse.Namespace) -> int:
-    candidates = _candidates(args)
     if args.json:
+        candidates = _candidates(args)
         print(json.dumps([item.to_dict() for item in candidates], indent=2))
     else:
-        _print_candidates(candidates)
+        console = make_console(no_color=args.no_color)
+        roots = args.paths or [Path.cwd()]
+        render_header(
+            console,
+            "Workspace scan",
+            "Finding generated artifacts that can be rebuilt when needed.",
+        )
+        with scan_status(console, roots, enabled=console.is_terminal):
+            candidates = _candidates(args)
+        render_candidates(console, candidates)
     return 0
 
 
 def _clean_command(args: argparse.Namespace) -> int:
-    candidates = _candidates(args)
+    if args.json:
+        candidates = _candidates(args)
+    else:
+        console = make_console(no_color=args.no_color)
+        render_header(
+            console,
+            "Cleanup preview",
+            "Nothing changes until the requested safety checks pass.",
+        )
+        roots = args.paths or [Path.cwd()]
+        with scan_status(console, roots, enabled=console.is_terminal):
+            candidates = _candidates(args)
     if not candidates:
-        print("No cleanup candidates found.")
+        if args.json:
+            print("[]")
+        else:
+            render_candidates(console, [])
         return 0
     if not args.yes:
-        _print_candidates(candidates)
+        if args.json:
+            print(json.dumps([item.to_dict() for item in candidates], indent=2))
+        else:
+            render_candidates(console, candidates)
         action = "archive" if args.archive else "permanently delete"
-        print(f"\nRefusing to {action} without --yes.", file=sys.stderr)
+        error_console = make_console(no_color=args.no_color, stderr=True)
+        render_error(error_console, f"Refusing to {action} without --yes.")
         return 2
 
     result = archive(candidates) if args.archive else delete(candidates)
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print(
-            f"{result['action'].capitalize()} complete: "
-            f"{len(candidates)} item(s), {human_size(int(result['total_size']))}."
+        render_action_result(
+            console,
+            action=str(result["action"]),
+            count=len(candidates),
+            total_size=int(result["total_size"]),
+            session_id=str(result["session_id"]),
         )
-        print(f"Session: {result['session_id']}")
     return 0
 
 
@@ -142,7 +198,15 @@ def _restore_command(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print(f"Restored {len(result['items'])} item(s) from {result['session_id']}.")
+        console = make_console(no_color=args.no_color)
+        render_header(console, "Archive restored", "Your generated artifacts are back in place.")
+        render_action_result(
+            console,
+            action="restore",
+            count=len(result["items"]),
+            total_size=int(result["total_size"]),
+            session_id=str(result["session_id"]),
+        )
     return 0
 
 
@@ -152,13 +216,19 @@ def _history_command(args: argparse.Namespace) -> int:
         print(json.dumps(records, indent=2))
         return 0
     if not records:
-        print("No cleanup history found.")
+        console = make_console(no_color=args.no_color)
+        render_header(console, "Cleanup history", "Local-only records of DevTidy actions.")
+        console.print("[dim]No cleanup history found.[/]")
         return 0
+    console = make_console(no_color=args.no_color)
+    render_header(console, "Cleanup history", "Local-only records of DevTidy actions.")
     for record in records:
         created = datetime.fromtimestamp(record["created_at"]).strftime("%Y-%m-%d %H:%M")
-        print(
-            f"{created}  {record['action']:<7}  "
-            f"{human_size(int(record['total_size'])):>10}  {record['session_id']}"
+        console.print(
+            f"[dim]{created}[/]  "
+            f"[bold]{record['action']:<7}[/]  "
+            f"[green]{human_size(int(record['total_size'])):>10}[/]  "
+            f"[dim]{record['session_id']}[/]"
         )
     return 0
 
@@ -176,10 +246,14 @@ def _rules_command(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(rules, indent=2))
     else:
+        console = make_console(no_color=args.no_color)
+        render_header(console, "Cleanup rules", "Every match is explainable and project-aware.")
         for rule in rules:
             names = ", ".join(rule["directories"])
-            print(f"{rule['name']} ({rule['category']}): {names}")
-            print(f"  {rule['description']}")
+            console.print(
+                f"[bold cyan]{rule['name']}[/] [dim]({rule['category']})[/]  {names}"
+            )
+            console.print(f"  [dim]{rule['description']}[/]")
     return 0
 
 
@@ -207,6 +281,6 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
     except (UnsafePathError, ValueError, FileExistsError, PermissionError) as error:
-        print(f"devtidy: error: {error}", file=sys.stderr)
+        no_color = bool(getattr(args, "no_color", False))
+        render_error(make_console(no_color=no_color, stderr=True), str(error))
         return 1
-

@@ -17,6 +17,7 @@ easy, but removing data should require an explicit decision.
 - Can archive files with a manifest and restore them later.
 - Produces machine-readable JSON for scripts and CI.
 - Stores cleanup history locally. No telemetry or network calls.
+- Presents scans with a colorful terminal dashboard and animated progress.
 
 ## Install
 
@@ -50,6 +51,9 @@ devtidy restore --latest
 
 # JSON output for automation
 devtidy scan . --json
+
+# Disable styling for basic terminals
+devtidy scan . --no-color
 ```
 
 ## Commands

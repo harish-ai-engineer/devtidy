@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "devtidy"
-version = "0.1.0"
+version = "0.2.0"
 description = "Safely find and reclaim stale developer build artifacts and environments."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,6 +13,10 @@ authors = [
   { name = "Harish" }
 ]
 keywords = ["cleanup", "developer-tools", "disk-space", "node-modules", "virtualenv"]
+dependencies = [
+  "rich>=13.9",
+  "rich-argparse>=1.7",
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",

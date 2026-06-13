@@ -106,10 +106,9 @@ matched inside recognized projects. Generic folders named `env`, `build`, or
 - **ByteBroom**: playful, but too close to the inspiration's branding.
 - **ProjectPrune**: descriptive, but may imply source-code deletion.
 
-Before publishing, replace the placeholder project URLs in `pyproject.toml` and
-confirm the final name at <https://pypi.org/>.
+Project source and issue tracking are available at
+<https://github.com/harish-ai-engineer/devtidy>.
 
 ## License
 
 MIT
-

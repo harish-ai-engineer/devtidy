@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-  { name = "DevTidy contributors" }
+  { name = "Harish" }
 ]
 keywords = ["cleanup", "developer-tools", "disk-space", "node-modules", "virtualenv"]
 classifiers = [
@@ -31,8 +31,9 @@ classifiers = [
 devtidy = "devtidy.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/your-account/devtidy"
-Issues = "https://github.com/your-account/devtidy/issues"
+Homepage = "https://github.com/harish-ai-engineer/devtidy"
+Repository = "https://github.com/harish-ai-engineer/devtidy.git"
+Issues = "https://github.com/harish-ai-engineer/devtidy/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -25,6 +25,23 @@ easy, but removing data should require an explicit decision.
 pipx install devtidy
 ```
 
+`pip` works too:
+
+```console
+pip install devtidy
+```
+
+If `devtidy` isn't found on your `PATH` after a plain `pip install`, either run it
+as a module instead:
+
+```console
+python -m devtidy scan .
+```
+
+or add your Python user-scripts directory to `PATH` (`pip show -f devtidy` shows
+where the `devtidy` script was installed). `pipx` avoids this entirely by managing
+the `PATH` entry for you.
+
 For local development:
 
 ```console

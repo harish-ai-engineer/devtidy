@@ -119,17 +119,6 @@ belong to a project containing `package.json`. Build directories are only
 matched inside recognized projects. Generic folders named `env`, `build`, or
 `dist` are therefore not removed merely because their name looks familiar.
 
-## Name ideas considered
-
-- **DevTidy**: clear, friendly, and broad enough for future cleanup rules.
-- **RepoRinse**: memorable, but sounds limited to repositories.
-- **DevSweep**: direct, though more generic.
-- **ByteBroom**: playful, but too close to the inspiration's branding.
-- **ProjectPrune**: descriptive, but may imply source-code deletion.
-
-Project source and issue tracking are available at
-<https://github.com/harish-ai-engineer/devtidy>.
-
 ## License
 
 MIT

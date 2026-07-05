@@ -1,4 +1,4 @@
-# DevTidy
+# DevTeddy
 
 DevTidy is a conservative, cross-platform command-line tool for finding stale
 developer artifacts such as `node_modules`, Python virtual environments, build
